@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+### CONFIG ###
+HOSTS_FILE="/etc/hosts"
+STATE_DIR="$HOME/.cache/youtube-allow"
+LAST_USED="$STATE_DIR/last-used"
+COOLDOWN_MINUTES=10
+
+BEGIN_MARK="# BEGIN YOUTUBE BLOCK"
+END_MARK="# END YOUTUBE BLOCK"
+
+BLOCK_LINES=$(cat <<'EOF'
+0.0.0.0 youtube.com
+0.0.0.0 www.youtube.com
+0.0.0.0 m.youtube.com
+0.0.0.0 youtu.be
+0.0.0.0 googlevideo.com
+0.0.0.0 ytimg.com
+EOF
+)
+
+### INPUT ###
+if [[ $# -ne 1 ]] || ! [[ "$1" =~ ^[0-9]+$ ]]; then
+  echo "Usage: allow-youtube <minutes>"
+  exit 1
+fi
+
+MINUTES="$1"
+
+mkdir -p "$STATE_DIR"
+
+### COOLDOWN CHECK ###
+now=$(date +%s)
+
+if [[ -f "$LAST_USED" ]]; then
+  last=$(cat "$LAST_USED")
+  diff=$(( (now - last) / 60 ))
+
+  if (( diff < COOLDOWN_MINUTES )); then
+    wait=$(( COOLDOWN_MINUTES - diff ))
+    echo "Cooldown active. Try again in $wait minute(s)."
+    exit 1
+  fi
+fi
+
+### UNBLOCK ###
+echo "Enabling YouTube for $MINUTES minutes..."
+
+sudo sed -i "/$BEGIN_MARK/,/$END_MARK/d" "$HOSTS_FILE"
+
+date +%s > "$LAST_USED"
+
+### SCHEDULE RE-BLOCK ###
+systemd-run \
+  --unit=reblock-youtube \
+  --on-active="${MINUTES}m" \
+  --quiet \
+  sudo /usr/local/bin/block-youtube
+
+echo "YouTube will be blocked again automatically."

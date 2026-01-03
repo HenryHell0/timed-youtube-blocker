@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+HOSTS_FILE="/etc/hosts"
+
+BEGIN_MARK="# BEGIN YOUTUBE BLOCK"
+END_MARK="# END YOUTUBE BLOCK"
+
+BLOCK_LINES=$(cat <<'EOF'
+0.0.0.0 youtube.com
+0.0.0.0 www.youtube.com
+0.0.0.0 m.youtube.com
+0.0.0.0 youtu.be
+0.0.0.0 googlevideo.com
+0.0.0.0 ytimg.com
+EOF
+)
+
+if ! grep -q "$BEGIN_MARK" "$HOSTS_FILE"; then
+  {
+    echo
+    echo "$BEGIN_MARK"
+    echo "$BLOCK_LINES"
+    echo "$END_MARK"
+  } | sudo tee -a "$HOSTS_FILE" >/dev/null
+fi
