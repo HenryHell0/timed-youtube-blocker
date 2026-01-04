@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+STATE_DIR="$HOME/.config/timed-youtube-blocker"
+STATE_FILE="$STATE_DIR/state"
+
+if [[ ! -f "$STATE_FILE" ]]; then
+  echo "No state found. YouTube is blocked by default."
+  exit 0
+fi
+
+source "$STATE_FILE"
+
+now=$(date +%s)
+
+echo "YouTube Status:"
+if [[ "$status" == "allowed" ]]; then
+  remaining=$(( expires_at - now ))
+  if (( remaining < 0 )); then
+    remaining=0
+  fi
+  mins=$(( remaining / 60 ))
+  secs=$(( remaining % 60 ))
+  echo "  Status: ALLOWED"
+  printf "  Time remaining: %dm %ds\n" "$mins" "$secs"
+else
+  echo "  Status: BLOCKED"
+fi
+
+if (( cooldown_until > now )); then
+  remaining=$(( cooldown_until - now ))
+  mins=$(( remaining / 60 ))
+  secs=$(( remaining % 60 ))
+  printf "  Cooldown remaining: %dm %ds\n" "$mins" "$secs"
+else
+  echo "  Cooldown: None"
+fi

@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+### CONFIG ###
+STATE_DIR="$HOME/.config/timed-youtube-blocker"
+STATE_FILE="$STATE_DIR/state"
 HOSTS_FILE="/etc/hosts"
+COOLDOWN_MINUTES=10
 
+### /etc/hosts stuff ###
 BEGIN_MARK="# BEGIN YOUTUBE BLOCK"
 END_MARK="# END YOUTUBE BLOCK"
 
@@ -16,11 +21,33 @@ BLOCK_LINES=$(cat <<'EOF'
 EOF
 )
 
-if ! grep -q "$BEGIN_MARK" "$HOSTS_FILE"; then
-  {
-    echo
-    echo "$BEGIN_MARK"
-    echo "$BLOCK_LINES"
-    echo "$END_MARK"
-  } | sudo tee -a "$HOSTS_FILE" >/dev/null
-fi
+### CURRENT TIME ###
+now=$(date +%s)
+
+### UPDATE STATE ###
+status="blocked"
+expires_at=0
+cooldown_until=$(( now + COOLDOWN_MINUTES*60 ))
+
+mkdir -p "$STATE_DIR"
+tmp=$(mktemp)
+cat > "$tmp" <<EOF
+status=$status
+expires_at=$expires_at
+cooldown_until=$cooldown_until
+EOF
+mv "$tmp" "$STATE_FILE"
+
+### RE-BLOCK HOSTS ###
+# Remove old block section
+sudo sed -i "/$BEGIN_MARK/,/$END_MARK/d" "$HOSTS_FILE"
+
+# Append block section
+{
+  echo
+  echo "$BEGIN_MARK"
+  echo "$BLOCK_LINES"
+  echo "$END_MARK"
+} | sudo tee -a "$HOSTS_FILE" >/dev/null
+
+echo "YouTube is now blocked. Cooldown: $COOLDOWN_MINUTES minutes."
